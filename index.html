@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>👔 직업 변신 사진관 — Career Photo Studio</title>
+<meta property="og:title" content="직업 변신 사진관" />
+<meta property="og:description" content="내 사진을 8가지 직업 모습으로! 진로 체험 직업카드 메이커" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  * { -webkit-font-smoothing: antialiased; }
+  body { font-family: 'Pretendard', sans-serif; background: #0a0613; color: #f5f1e8; min-height: 100vh; overflow-x: hidden; }
+  .aurora { position: fixed; inset: 0; z-index: -1; overflow: hidden;
+    background:
+      radial-gradient(ellipse 80% 60% at 20% 0%, rgba(96,165,250,0.18), transparent 60%),
+      radial-gradient(ellipse 70% 50% at 80% 0%, rgba(74,222,128,0.15), transparent 60%),
+      radial-gradient(ellipse 80% 80% at 50% 100%, rgba(167,139,250,0.15), transparent 60%),
+      #0a0613;
+  }
+  .aurora::before, .aurora::after { content:""; position:absolute; border-radius:50%; filter:blur(80px); opacity:0.55; animation:float 18s ease-in-out infinite; }
+  .aurora::before { width:60vw; height:60vw; top:-20vw; left:-10vw; background: radial-gradient(circle, #60a5fa, transparent 70%); }
+  .aurora::after { width:55vw; height:55vw; bottom:-20vw; right:-10vw; background: radial-gradient(circle, #4ade80, transparent 70%); animation-delay:-9s; }
+  @keyframes float { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(40px,-40px) scale(1.1); } }
+  .glass { background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+    backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%);
+    border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 10px 40px -10px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06); }
+  .gradient-text { background: linear-gradient(120deg, #60a5fa 0%, #4ade80 50%, #a78bfa 100%);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+    background-size: 200% 200%; animation: gshift 8s ease infinite; }
+  @keyframes gshift { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+  .cta { position: relative; overflow: hidden; transition: transform .3s ease, box-shadow .3s ease; }
+  .cta::after { content:""; position:absolute; top:0; left:-150%; width:60%; height:100%;
+    background: linear-gradient(120deg, transparent 0%, rgba(255,255,255,0.35) 50%, transparent 100%);
+    transform: skewX(-20deg); transition: left .7s ease; }
+  .cta:hover { transform: translateY(-2px); box-shadow: 0 12px 30px -8px rgba(96,165,250,0.5); }
+  .cta:hover::after { left: 150%; }
+  .pill { display:inline-flex; align-items:center; gap:6px; font-size:.72rem; font-weight:700; letter-spacing:.04em;
+    padding:6px 12px; border-radius:999px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); color:#c5b8a3; }
+  #image-modal.hidden { display: none !important; }
+  #image-modal { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: 1rem; background: rgba(5,2,15,0.85); backdrop-filter: blur(8px); }
+  .card-print { aspect-ratio: 13/10; }
+</style>
+</head>
+<body>
+<div class="aurora"></div>
+
+<div class="container mx-auto px-4 py-8 md:py-12 max-w-6xl relative z-10">
+  <header class="text-center mb-10">
+    <span class="pill mb-3">🎯 진로 체험 · Gemini 2.5 Flash Image</span>
+    <h1 class="text-4xl md:text-6xl font-black mt-3"><span class="gradient-text">👔 직업 변신 사진관</span></h1>
+    <p class="mt-3 text-stone-300 text-base md:text-lg">내 사진 한 장으로 8가지 직업의 미래 모습을 만나보세요!</p>
+  </header>
+
+  <section id="upload-section" class="space-y-6">
+    <div class="glass rounded-3xl p-8 text-center">
+      <div id="image-placeholder">
+        <div class="text-5xl mb-3">📸</div>
+        <p class="text-lg font-semibold text-stone-200">변신할 얼굴 사진을 올려주세요</p>
+        <p class="text-sm text-stone-500 mt-1">얼굴이 잘 보이는 정면 사진일수록 결과가 좋아요</p>
+      </div>
+      <div id="image-preview-container" class="hidden">
+        <img id="image-preview" class="max-h-72 mx-auto rounded-2xl object-contain" alt="원본 사진" />
+      </div>
+      <label for="image-upload" id="upload-label"
+             class="cta inline-block mt-6 bg-gradient-to-r from-blue-500 to-emerald-500 text-white font-bold py-3 px-7 rounded-2xl shadow-lg cursor-pointer">
+        📷 사진 선택하기
+      </label>
+      <input id="image-upload" type="file" accept="image/*" class="hidden" />
+    </div>
+
+    <div class="glass rounded-3xl p-6">
+      <label class="block text-sm font-semibold text-stone-300 mb-2">Google Gemini API Key</label>
+      <input type="password" id="api-key" autocomplete="off"
+             class="w-full px-4 py-3 bg-black/30 border border-white/10 rounded-xl text-stone-200 placeholder-stone-600 focus:outline-none focus:border-blue-400"
+             placeholder="AI- 로 시작하는 API 키를 붙여넣으세요" />
+      <p class="mt-2 text-xs text-stone-500 text-right">
+        키가 없으신가요? <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" class="text-blue-300 hover:underline">여기서 무료 발급</a>
+      </p>
+    </div>
+
+    <div id="generate-area" class="text-center hidden">
+      <p class="text-stone-400 text-sm mb-4">8가지 직업으로 동시 변환됩니다</p>
+      <div class="flex flex-wrap justify-center gap-2 mb-6 text-xs">
+        <span class="pill">🩺 의사</span>
+        <span class="pill">👨‍🍳 셰프</span>
+        <span class="pill">🚀 우주비행사</span>
+        <span class="pill">🎨 디자이너</span>
+        <span class="pill">🔬 과학자</span>
+        <span class="pill">📚 교사</span>
+        <span class="pill">💻 개발자</span>
+        <span class="pill">⚽ 운동선수</span>
+      </div>
+      <button id="generate-btn" disabled
+              class="cta bg-gradient-to-r from-blue-500 via-emerald-500 to-violet-500 text-white font-bold text-lg px-10 py-4 rounded-2xl shadow-xl disabled:opacity-40 disabled:cursor-not-allowed">
+        ✨ 직업 변신 시작!
+      </button>
+    </div>
+
+    <div id="error-msg" class="hidden glass rounded-2xl p-4 text-center text-rose-300 border-rose-500/30 bg-rose-500/10"></div>
+  </section>
+
+  <section id="results-section" class="hidden mt-16">
+    <div class="text-center mb-8">
+      <h2 class="text-3xl md:text-4xl font-black"><span class="gradient-text">8가지 직업 변신 결과</span></h2>
+      <p class="text-stone-400 mt-2">마음에 드는 직업카드를 골라 인쇄해 보세요!</p>
+      <div class="mt-5 flex flex-wrap justify-center gap-3">
+        <button id="download-all" class="cta bg-emerald-500 text-white font-bold px-6 py-3 rounded-2xl shadow-lg">📦 전체 ZIP 다운로드</button>
+        <button id="reset-btn" class="cta bg-white/5 hover:bg-white/10 border border-white/10 text-stone-200 font-bold px-6 py-3 rounded-2xl">🔁 다시 시작</button>
+      </div>
+    </div>
+    <div id="results-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"></div>
+  </section>
+
+  <footer class="text-center text-stone-500 text-sm mt-20 pb-8">
+    <p>Made by <a href="https://litt.ly/dot_connector" target="_blank" rel="noopener" class="text-blue-300 hover:underline">김진관 (닷커넥터)</a></p>
+    <p class="mt-1 text-xs">Powered by Google Gemini 2.5 Flash Image · 진로 체험 시리즈</p>
+  </footer>
+</div>
+
+<!-- Image modal -->
+<div id="image-modal" class="hidden" role="dialog" aria-modal="true">
+  <button id="modal-close" class="absolute top-5 right-5 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white text-xl">✕</button>
+  <img id="modal-img" class="max-w-[92vw] max-h-[88vh] rounded-2xl shadow-2xl" alt="확대" />
+</div>
+
+<script>
+const COMMON_SUFFIX = " The original person's core facial features, ethnicity, age range, and gender must be preserved. Highly realistic, natural lighting, professional photography quality. The image must not contain any text or letters. Final output: high-resolution horizontal image with strict 13:10 aspect ratio, suitable for printing as a career card.";
+
+const CAREERS = [
+  { id: "doctor",     emoji: "🩺", name: "의사",       color: "rose",
+    prompt: "Transform the person in the photo into a confident medical doctor wearing a clean white doctor's coat with a stethoscope around the neck, standing in a bright modern hospital corridor or examination room. Professional and caring expression." },
+  { id: "chef",       emoji: "👨‍🍳", name: "셰프",       color: "amber",
+    prompt: "Transform the person in the photo into a passionate professional chef wearing a crisp white chef uniform and tall white chef hat, in a high-end restaurant kitchen with stainless steel surfaces and warm hanging lights. Confident expression holding a small wooden spoon." },
+  { id: "astronaut",  emoji: "🚀", name: "우주비행사",   color: "indigo",
+    prompt: "Transform the person in the photo into a heroic astronaut wearing a detailed white space suit with mission patches, holding the helmet under one arm, standing on a space station platform with Earth and stars visible through a large window behind. Determined and inspiring expression." },
+  { id: "designer",   emoji: "🎨", name: "디자이너",     color: "fuchsia",
+    prompt: "Transform the person in the photo into a creative designer wearing stylish modern attire (casual blazer, glasses), in a bright design studio with sketches, color swatches, and a sleek tablet on the desk. Thoughtful and artistic expression." },
+  { id: "scientist",  emoji: "🔬", name: "과학자",       color: "cyan",
+    prompt: "Transform the person in the photo into a brilliant research scientist wearing a clean lab coat with safety glasses raised on the head, in a high-tech laboratory with microscopes, beakers with colorful liquids, and computer monitors. Curious and focused expression." },
+  { id: "teacher",    emoji: "📚", name: "교사",         color: "emerald",
+    prompt: "Transform the person in the photo into a warm professional teacher wearing tidy professional attire, holding an open book, standing in a bright modern classroom with a clean blackboard and bookshelves softly out of focus behind. Kind and encouraging expression." },
+  { id: "developer",  emoji: "💻", name: "개발자",       color: "sky",
+    prompt: "Transform the person in the photo into a modern software developer wearing casual tech-style clothing (hoodie or smart-casual shirt), at a clean desk with multiple monitors showing colorful code, in a sleek modern tech office with soft blue lighting. Focused and creative expression." },
+  { id: "athlete",    emoji: "⚽", name: "운동선수",     color: "orange",
+    prompt: "Transform the person in the photo into a powerful professional athlete wearing a modern athletic uniform, standing in a large illuminated sports stadium or arena at golden hour. Strong and confident athletic pose with determined expression." }
+];
+
+const colorMap = {
+  rose: "from-rose-500 to-pink-500",
+  amber: "from-amber-500 to-orange-500",
+  indigo: "from-indigo-500 to-purple-500",
+  fuchsia: "from-fuchsia-500 to-pink-500",
+  cyan: "from-cyan-500 to-sky-500",
+  emerald: "from-emerald-500 to-teal-500",
+  sky: "from-sky-500 to-blue-500",
+  orange: "from-orange-500 to-amber-500"
+};
+
+const $ = id => document.getElementById(id);
+let originalImage = null; // { base64, mime }
+let apiKey = "";
+let results = [];
+
+const showError = (msg) => { const e = $("error-msg"); e.textContent = msg; e.classList.remove("hidden"); };
+const clearError = () => $("error-msg").classList.add("hidden");
+
+const updateBtn = () => {
+  $("generate-btn").disabled = !originalImage || !apiKey.trim();
+};
+
+$("image-upload").addEventListener("change", (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  clearError();
+  const reader = new FileReader();
+  reader.onload = () => {
+    originalImage = { base64: reader.result.split(",")[1], mime: f.type, dataUrl: reader.result };
+    $("image-preview").src = reader.result;
+    $("image-placeholder").classList.add("hidden");
+    $("image-preview-container").classList.remove("hidden");
+    $("upload-label").textContent = "📷 다른 사진 선택";
+    $("generate-area").classList.remove("hidden");
+    updateBtn();
+  };
+  reader.readAsDataURL(f);
+});
+
+$("api-key").addEventListener("input", (e) => { apiKey = e.target.value; updateBtn(); });
+
+const callGemini = async (prompt, retries = 2) => {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${apiKey}`;
+  const body = {
+    contents: [{ parts: [{ text: prompt + COMMON_SUFFIX }, { inlineData: { mimeType: originalImage.mime, data: originalImage.base64 } }] }],
+    generationConfig: { responseModalities: ["IMAGE"] },
+    safetySettings: ["HARASSMENT","HATE_SPEECH","SEXUALLY_EXPLICIT","DANGEROUS_CONTENT"].map(c => ({ category: "HARM_CATEGORY_"+c, threshold: "BLOCK_NONE" }))
+  };
+  try {
+    const r = await fetch(url, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) });
+    if (!r.ok) {
+      if (r.status === 429 && retries > 0) { await new Promise(x => setTimeout(x, 1500)); return callGemini(prompt, retries-1); }
+      throw new Error(`API ${r.status}`);
+    }
+    const j = await r.json();
+    const part = j?.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
+    if (!part) throw new Error("이미지 응답 없음");
+    return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+  } catch (e) { throw e; }
+};
+
+const renderResults = () => {
+  const grid = $("results-grid");
+  grid.innerHTML = results.map((r, i) => {
+    const c = CAREERS[i];
+    const grad = colorMap[c.color];
+    const inner = r.status === "ok"
+      ? `<img src="${r.src}" alt="${c.name}" class="w-full h-full object-cover cursor-pointer" data-i="${i}" />`
+      : r.status === "fail"
+      ? `<div class="w-full h-full flex items-center justify-center text-rose-300 text-sm">생성 실패</div>`
+      : `<div class="w-full h-full flex items-center justify-center"><div class="w-10 h-10 border-4 border-stone-600 border-t-blue-400 rounded-full animate-spin"></div></div>`;
+    return `
+      <div class="glass rounded-3xl overflow-hidden flex flex-col">
+        <div class="card-print bg-black/30 overflow-hidden">${inner}</div>
+        <div class="p-4 text-center">
+          <div class="text-3xl mb-1">${c.emoji}</div>
+          <h3 class="font-black text-lg">${c.name}</h3>
+          <button class="dl-btn mt-3 w-full bg-gradient-to-r ${grad} text-white font-bold py-2 rounded-xl text-sm disabled:opacity-40" data-i="${i}" ${r.status!=="ok"?"disabled":""}>💾 저장</button>
+        </div>
+      </div>`;
+  }).join("");
+  grid.querySelectorAll("img[data-i]").forEach(im => im.addEventListener("click", () => openModal(im.src)));
+  grid.querySelectorAll(".dl-btn").forEach(b => b.addEventListener("click", () => downloadOne(parseInt(b.dataset.i,10))));
+};
+
+const downloadOne = (i) => {
+  const r = results[i]; if (r.status !== "ok") return;
+  const a = document.createElement("a");
+  a.href = r.src; a.download = `직업카드_${CAREERS[i].name}.png`; a.click();
+};
+
+$("download-all").addEventListener("click", async () => {
+  const zip = new JSZip();
+  results.forEach((r, i) => {
+    if (r.status === "ok") {
+      const data = r.src.split(",")[1];
+      zip.file(`직업카드_${CAREERS[i].name}.png`, data, { base64: true });
+    }
+  });
+  const blob = await zip.generateAsync({ type: "blob" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "career_cards.zip"; a.click();
+});
+
+$("reset-btn").addEventListener("click", () => location.reload());
+
+const openModal = (src) => { $("modal-img").src = src; $("image-modal").classList.remove("hidden"); document.body.style.overflow="hidden"; };
+$("modal-close").addEventListener("click", () => { $("image-modal").classList.add("hidden"); document.body.style.overflow=""; });
+$("image-modal").addEventListener("click", e => { if (e.target.id === "image-modal") { $("image-modal").classList.add("hidden"); document.body.style.overflow=""; } });
+
+$("generate-btn").addEventListener("click", async () => {
+  if (!originalImage || !apiKey.trim()) return;
+  clearError();
+  $("generate-btn").disabled = true;
+  $("generate-btn").innerHTML = '<span class="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2 align-middle"></span> 생성 중...';
+  results = CAREERS.map(() => ({ status: "loading", src: "" }));
+  $("results-section").classList.remove("hidden");
+  renderResults();
+  $("results-section").scrollIntoView({ behavior: "smooth", block: "start" });
+
+  await Promise.all(CAREERS.map(async (c, i) => {
+    try {
+      const src = await callGemini(c.prompt);
+      results[i] = { status: "ok", src };
+    } catch (e) {
+      results[i] = { status: "fail", src: "", err: e.message };
+    }
+    renderResults();
+  }));
+
+  $("generate-btn").disabled = false;
+  $("generate-btn").innerHTML = "✨ 다시 변환하기";
+});
+</script>
+</body>
+</html>
