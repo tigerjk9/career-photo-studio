@@ -41,6 +41,17 @@
   #image-modal.hidden { display: none !important; }
   #image-modal { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: 1rem; background: rgba(5,2,15,0.85); backdrop-filter: blur(8px); }
   .card-print { aspect-ratio: 13/10; }
+
+  /* ── Before/After Slider ── */
+  .ba-wrap { position: relative; width: 100%; height: 100%; overflow: hidden; cursor: ew-resize; user-select: none; }
+  .ba-after, .ba-before { position: absolute; inset: 0; overflow: hidden; }
+  .ba-after img, .ba-before img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .ba-before { width: 50%; }
+  .ba-handle { position: absolute; top: 0; bottom: 0; left: 50%; width: 3px; background: linear-gradient(180deg, #fff, rgba(255,255,255,0.8)); transform: translateX(-50%); pointer-events: none; box-shadow: 0 0 12px rgba(255,255,255,0.6); }
+  .ba-knob { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 36px; height: 36px; border-radius: 50%; background: white; box-shadow: 0 4px 16px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; color: #1a0e2e; font-weight: 900; font-size: 18px; pointer-events: none; }
+  .ba-label { position: absolute; top: 8px; padding: 3px 9px; border-radius: 999px; font-size: 10px; font-weight: 800; letter-spacing: 0.05em; color: white; background: rgba(0,0,0,0.6); pointer-events: none; }
+  .ba-label.before-label { left: 8px; }
+  .ba-label.after-label { right: 8px; background: rgba(96,165,250,0.85); }
 </style>
 </head>
 <body>
@@ -249,7 +260,13 @@ const renderResults = () => {
     const c = CAREERS[i];
     const grad = colorMap[c.color];
     const inner = r.status === "ok"
-      ? `<img src="${r.src}" alt="${c.name}" class="w-full h-full object-cover cursor-pointer" data-i="${i}" />`
+      ? `<div class="ba-wrap" data-i="${i}">
+           <div class="ba-after"><img src="${r.src}" alt="${c.name} 변환 후" /></div>
+           <div class="ba-before"><img src="${originalImage.dataUrl}" alt="원본" /></div>
+           <div class="ba-handle"><div class="ba-knob">↔</div></div>
+           <span class="ba-label before-label">BEFORE</span>
+           <span class="ba-label after-label">${c.name}</span>
+         </div>`
       : r.status === "fail"
       ? `<div class="w-full h-full flex items-center justify-center text-rose-300 text-sm">생성 실패</div>`
       : `<div class="w-full h-full flex items-center justify-center"><div class="w-10 h-10 border-4 border-stone-600 border-t-blue-400 rounded-full animate-spin"></div></div>`;
@@ -263,8 +280,26 @@ const renderResults = () => {
         </div>
       </div>`;
   }).filter(Boolean).join("");
-  grid.querySelectorAll("img[data-i]").forEach(im => im.addEventListener("click", () => openModal(im.src)));
   grid.querySelectorAll(".dl-btn").forEach(b => b.addEventListener("click", () => downloadOne(parseInt(b.dataset.i,10))));
+  // Before/After slider drag
+  grid.querySelectorAll(".ba-wrap").forEach(wrap => {
+    const before = wrap.querySelector(".ba-before");
+    const handle = wrap.querySelector(".ba-handle");
+    const move = (clientX) => {
+      const rect = wrap.getBoundingClientRect();
+      let pct = ((clientX - rect.left) / rect.width) * 100;
+      pct = Math.max(0, Math.min(100, pct));
+      before.style.width = pct + "%";
+      handle.style.left = pct + "%";
+    };
+    let dragging = false;
+    wrap.addEventListener("pointerdown", (e) => { dragging = true; wrap.setPointerCapture(e.pointerId); move(e.clientX); });
+    wrap.addEventListener("pointermove", (e) => { if (dragging) move(e.clientX); });
+    wrap.addEventListener("pointerup", () => { dragging = false; });
+    wrap.addEventListener("pointercancel", () => { dragging = false; });
+    // Double-click → fullscreen modal of result
+    wrap.addEventListener("dblclick", () => openModal(wrap.querySelector(".ba-after img").src));
+  });
 };
 
 const downloadOne = (i) => {
