@@ -80,22 +80,32 @@
       </p>
     </div>
 
-    <div id="generate-area" class="text-center hidden">
-      <p class="text-stone-400 text-sm mb-4">8가지 직업으로 동시 변환됩니다</p>
-      <div class="flex flex-wrap justify-center gap-2 mb-6 text-xs">
-        <span class="pill">🩺 의사</span>
-        <span class="pill">👨‍🍳 셰프</span>
-        <span class="pill">🚀 우주비행사</span>
-        <span class="pill">🎨 디자이너</span>
-        <span class="pill">🔬 과학자</span>
-        <span class="pill">📚 교사</span>
-        <span class="pill">💻 개발자</span>
-        <span class="pill">⚽ 운동선수</span>
+    <div id="generate-area" class="hidden">
+      <div class="glass rounded-3xl p-6">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="text-lg font-bold text-stone-200">변신할 직업 선택</h3>
+            <p class="text-xs text-stone-500 mt-1">원하는 직업을 골라주세요 (1~8개)</p>
+          </div>
+          <div class="text-right">
+            <p class="text-xs text-stone-500">선택됨</p>
+            <p class="text-2xl font-black gradient-text"><span id="sel-count">1</span><span class="text-sm text-stone-500"> / 8</span></p>
+          </div>
+        </div>
+        <div id="career-checkboxes" class="grid grid-cols-2 sm:grid-cols-4 gap-2"></div>
+        <div class="flex justify-center gap-2 mt-4 text-xs">
+          <button id="select-all" class="text-stone-400 hover:text-white px-3 py-1 rounded-full bg-white/5 hover:bg-white/10">전체 선택</button>
+          <button id="clear-all" class="text-stone-400 hover:text-white px-3 py-1 rounded-full bg-white/5 hover:bg-white/10">전체 해제</button>
+        </div>
       </div>
-      <button id="generate-btn" disabled
-              class="cta bg-gradient-to-r from-blue-500 via-emerald-500 to-violet-500 text-white font-bold text-lg px-10 py-4 rounded-2xl shadow-xl disabled:opacity-40 disabled:cursor-not-allowed">
-        ✨ 직업 변신 시작!
-      </button>
+
+      <div class="text-center mt-6">
+        <p class="text-xs text-stone-500 mb-3">💡 이미지 생성에는 API 비용이 발생합니다. 필요한 만큼만 선택해 주세요.</p>
+        <button id="generate-btn" disabled
+                class="cta bg-gradient-to-r from-blue-500 via-emerald-500 to-violet-500 text-white font-bold text-lg px-10 py-4 rounded-2xl shadow-xl disabled:opacity-40 disabled:cursor-not-allowed">
+          ✨ <span id="gen-label">선택한 1개 직업 변신!</span>
+        </button>
+      </div>
     </div>
 
     <div id="error-msg" class="hidden glass rounded-2xl p-4 text-center text-rose-300 border-rose-500/30 bg-rose-500/10"></div>
@@ -162,12 +172,35 @@ const $ = id => document.getElementById(id);
 let originalImage = null; // { base64, mime }
 let apiKey = "";
 let results = [];
+let selectedIdx = new Set([0]); // default: 의사
 
 const showError = (msg) => { const e = $("error-msg"); e.textContent = msg; e.classList.remove("hidden"); };
 const clearError = () => $("error-msg").classList.add("hidden");
 
 const updateBtn = () => {
-  $("generate-btn").disabled = !originalImage || !apiKey.trim();
+  const n = selectedIdx.size;
+  $("generate-btn").disabled = !originalImage || !apiKey.trim() || n === 0;
+  $("gen-label").textContent = `선택한 ${n}개 직업 변신!`;
+  $("sel-count").textContent = n;
+};
+
+const renderCheckboxes = () => {
+  const box = $("career-checkboxes");
+  box.innerHTML = CAREERS.map((c, i) => {
+    const on = selectedIdx.has(i);
+    return `
+      <label class="flex items-center gap-2 px-3 py-2.5 rounded-xl border cursor-pointer transition select-none
+                    ${on ? 'bg-blue-500/15 border-blue-400/50 text-stone-100' : 'bg-white/5 border-white/10 text-stone-400 hover:bg-white/10'}">
+        <input type="checkbox" data-i="${i}" ${on?'checked':''} class="career-cb w-4 h-4 accent-blue-500" />
+        <span class="text-base">${c.emoji}</span>
+        <span class="text-sm font-bold">${c.name}</span>
+      </label>`;
+  }).join("");
+  box.querySelectorAll(".career-cb").forEach(cb => cb.addEventListener("change", e => {
+    const i = parseInt(e.target.dataset.i, 10);
+    if (e.target.checked) selectedIdx.add(i); else selectedIdx.delete(i);
+    renderCheckboxes(); updateBtn();
+  }));
 };
 
 $("image-upload").addEventListener("change", (e) => {
@@ -181,6 +214,7 @@ $("image-upload").addEventListener("change", (e) => {
     $("image-preview-container").classList.remove("hidden");
     $("upload-label").textContent = "📷 다른 사진 선택";
     $("generate-area").classList.remove("hidden");
+    renderCheckboxes();
     updateBtn();
   };
   reader.readAsDataURL(f);
@@ -211,6 +245,7 @@ const callGemini = async (prompt, retries = 2) => {
 const renderResults = () => {
   const grid = $("results-grid");
   grid.innerHTML = results.map((r, i) => {
+    if (r.status === "skip") return "";
     const c = CAREERS[i];
     const grad = colorMap[c.color];
     const inner = r.status === "ok"
@@ -227,7 +262,7 @@ const renderResults = () => {
           <button class="dl-btn mt-3 w-full bg-gradient-to-r ${grad} text-white font-bold py-2 rounded-xl text-sm disabled:opacity-40" data-i="${i}" ${r.status!=="ok"?"disabled":""}>💾 저장</button>
         </div>
       </div>`;
-  }).join("");
+  }).filter(Boolean).join("");
   grid.querySelectorAll("img[data-i]").forEach(im => im.addEventListener("click", () => openModal(im.src)));
   grid.querySelectorAll(".dl-btn").forEach(b => b.addEventListener("click", () => downloadOne(parseInt(b.dataset.i,10))));
 };
@@ -256,19 +291,25 @@ const openModal = (src) => { $("modal-img").src = src; $("image-modal").classLis
 $("modal-close").addEventListener("click", () => { $("image-modal").classList.add("hidden"); document.body.style.overflow=""; });
 $("image-modal").addEventListener("click", e => { if (e.target.id === "image-modal") { $("image-modal").classList.add("hidden"); document.body.style.overflow=""; } });
 
+$("select-all").addEventListener("click", () => { selectedIdx = new Set(CAREERS.map((_,i)=>i)); renderCheckboxes(); updateBtn(); });
+$("clear-all").addEventListener("click", () => { selectedIdx = new Set(); renderCheckboxes(); updateBtn(); });
+
 $("generate-btn").addEventListener("click", async () => {
-  if (!originalImage || !apiKey.trim()) return;
+  if (!originalImage || !apiKey.trim() || selectedIdx.size === 0) return;
   clearError();
   $("generate-btn").disabled = true;
   $("generate-btn").innerHTML = '<span class="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2 align-middle"></span> 생성 중...';
-  results = CAREERS.map(() => ({ status: "loading", src: "" }));
+
+  // Initialize results for selected only
+  results = CAREERS.map((_, i) => selectedIdx.has(i) ? { status: "loading", src: "" } : { status: "skip", src: "" });
   $("results-section").classList.remove("hidden");
   renderResults();
   $("results-section").scrollIntoView({ behavior: "smooth", block: "start" });
 
-  await Promise.all(CAREERS.map(async (c, i) => {
+  const targets = [...selectedIdx];
+  await Promise.all(targets.map(async (i) => {
     try {
-      const src = await callGemini(c.prompt);
+      const src = await callGemini(CAREERS[i].prompt);
       results[i] = { status: "ok", src };
     } catch (e) {
       results[i] = { status: "fail", src: "", err: e.message };
